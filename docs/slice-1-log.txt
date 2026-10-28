@@ -1,0 +1,50 @@
+Slice 1: Scaffold + read-only SQL executor
+==========================================
+
+What was built
+--------------
+- uv project (pyproject.toml, uv.lock): src layout, hatchling build, no runtime dependencies yet;
+  pytest and ruff in the dev group.
+- src/askdb/config.py: Settings (query_timeout_seconds=10, row_cap=1000, busy_timeout_ms=5000),
+  read from ASKDB_QUERY_TIMEOUT_SECONDS, ASKDB_ROW_CAP, ASKDB_BUSY_TIMEOUT_MS. A bad value raises
+  ValueError naming the variable.
+- src/askdb/errors.py: QueryError with user_message (safe to show) and detail (raw text, for the
+  audit log and the model's retries). Subclasses: UnsafeSQLError, QueryTimeout, DatabaseBusy,
+  QueryFailed.
+- src/askdb/sql_guard.py: validate_sql() accepts one SELECT/WITH statement. It works on a skeleton
+  of the SQL (comments blanked, quoted text replaced) so keywords inside strings, comments and
+  quoted identifiers are neither false alarms nor hiding places. It rejects multiple statements,
+  INSERT/UPDATE/DELETE/DROP/CREATE/ALTER/ATTACH/DETACH/PRAGMA/VACUUM/REINDEX/ANALYZE/
+  load_extension anywhere (a WITH clause can prefix a write), and REPLACE INTO. REPLACE() the
+  function is allowed.
+- src/askdb/executor.py: run_query() opens a fresh mode=ro connection per query (plus
+  PRAGMA query_only as a second guard), installs a progress handler that aborts after the time
+  limit, sets the busy timeout, and returns at most row_cap rows with a truncated flag.
+  connect_readonly() is exposed so tests can prove mode=ro holds without the guard.
+- CLAUDE.md: Commands section updated for the new scaffold; removed the "PLAN.md does not exist
+  yet" remark.
+- docs/PLAN.md: slice 1 ticked; one-line notes added under slices 2, 3 and 5.
+
+Verification
+------------
+- uv run pytest: 73 passed.
+- uv run ruff check .: all checks passed.
+- Write attempts (INSERT, UPDATE, DELETE, DROP, ATTACH, PRAGMA, multi-statement, CTE+DELETE) are
+  rejected, and the DB file hash and directory listing are unchanged (tests run on a temp copy of
+  data/cloudmetrics.db).
+- mode=ro blocks writes even with the guard bypassed and query_only switched off.
+- A four-way cross join of invoices aborts within the timeout (0.3s in the test); the next query
+  still runs.
+- A query over 1,000 rows returns exactly 1,000 rows with truncated=True; exactly the cap is not
+  flagged.
+- WITH queries work; a locked database (exclusive lock, rollback-journal mode) gives DatabaseBusy
+  with a friendly message; a missing file fails without being created; SQLite error text never
+  appears in user_message.
+
+Notes
+-----
+- Tests that need a locked database switch the temp copy to journal_mode=DELETE, because a WAL
+  database lets readers through a writer's lock.
+- Python 3.10.11 is the interpreter on this machine; requires-python is >=3.10.
+- Not in this slice: the SQLite authorizer (removed from v1), env settings for API key, model,
+  app DB path, allowed directory and timezone (they arrive with the slices that use them).

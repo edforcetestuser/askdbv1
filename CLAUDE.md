@@ -8,7 +8,7 @@ They get a written answer, a result table and a plain-English account of how it 
 
 ## Source of truth
 - `docs/SPEC.md` is the source of truth. If code and spec disagree, the spec wins, or the spec is changed first.
-- `docs/PLAN.md` tracks progress. Update it in the same change that completes a step. (It does not exist yet; create it when work starts.)
+- `docs/PLAN.md` tracks progress. Update it in the same change that completes a step.
 
 ## Stack
 - Backend: Python + FastAPI (single uvicorn process), managed with `uv`.
@@ -16,7 +16,7 @@ They get a written answer, a result table and a plain-English account of how it 
 - LLM: Claude via the Anthropic API (tool-use loop). Data: SQLite only.
 
 ## Commands
-The repo has no code or tooling yet. These are the intended commands; correct them here as soon as the scaffolding exists.
+The backend scaffold exists (slice 1). `askdb.main` arrives in slice 5 and `frontend/` in slice 7, so the Run command and the whole frontend column are intended commands until then; correct them here when those slices land.
 
 | Task | Backend (repo root) | Frontend (`frontend/`) |
 |---|---|---|
@@ -36,7 +36,6 @@ The repo has no code or tooling yet. These are the intended commands; correct th
 ## Guardrails
 - **Read-only SQL**: open target DBs with `mode=ro`; accept a single `SELECT`/`WITH` only; reject `ATTACH`, `DETACH`, `PRAGMA`, `load_extension`. Never write to a target DB.
 - **Row cap and timeout**: display at most 1,000 rows; abort queries after 10s (progress handler); a turn is capped at 8 tool steps and 60s.
-- Hidden tables/columns never reach the prompt, the SQL or the CSV.
 - Never commit secrets (API keys, passwords, session secrets). Configuration comes from environment variables.
 - Never read `.env` files. Ask the user for any value you need.
 - Never show raw errors to users; log them to the audit log.
